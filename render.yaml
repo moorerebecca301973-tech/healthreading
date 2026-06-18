@@ -1,0 +1,27 @@
+# Render Blueprint for Medical Monitor Backend
+# Deploy this service on Render.com:
+# 1. Push your backend code to GitHub
+# 2. Create a new "Web Service" on Render
+# 3. Connect your GitHub repo
+# 4. Render will read this file automatically
+
+services:
+  - type: web
+    name: medical-monitor-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true  # Render generates a random secret
+      - key: SEEDED_USERNAME
+        value: admin
+      - key: SEEDED_PASSWORD
+        value: admin123
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: PYTHON_VERSION
+        value: "3.11"
