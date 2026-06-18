@@ -3,15 +3,16 @@ Security utilities: Argon2 password hashing, JWT token creation/verification.
 
 Uses pwdlib with Argon2 (winner of the 2015 Password Hashing Competition).
 Argon2 is memory-hard and resists brute-force, side-channel, and precomputation attacks.
+Uses PyJWT for token handling (actively maintained, supports Python 3.14).
 """
 
 import os
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
+import jwt as pyjwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
 from pydantic import BaseModel
 
 # pwdlib with Argon2 for password hashing
@@ -31,7 +32,7 @@ SEEDED_USERNAME = os.getenv("SEEDED_USERNAME", "admin")
 SEEDED_PASSWORD = os.getenv("SEEDED_PASSWORD", "admin123")
 
 # ---------------------------------------------------------------------------
-# Password Hashing (Argon2)
+# Password Hashing (Argon2 via pwdlib)
 # ---------------------------------------------------------------------------
 
 # pwdlib PasswordHash with only Argon2 (no bcrypt fallback)
@@ -49,7 +50,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# JWT Token Management
+# JWT Token Management (PyJWT)
 # ---------------------------------------------------------------------------
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -69,7 +70,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = pyjwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
@@ -86,12 +87,14 @@ async def get_current_username(token: str = Depends(oauth2_scheme)) -> str:
     )
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = pyjwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: Optional[str] = payload.get("sub")
         if username is None:
             raise credentials_exception
-        # Verify expiration is handled by jwt.decode automatically
-    except JWTError:
+        # PyJWT handles expiration automatically
+    except pyjwt.ExpiredSignatureError:
+        raise credentials_exception
+    except pyjwt.PyJWTError:
         raise credentials_exception
 
     return username
